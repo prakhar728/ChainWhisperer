@@ -1,0 +1,39 @@
+{
+  "name": "chainwhisperer",
+  "version": "0.1.0",
+  "description": "AI-powered smart contract analyzer browser extension for Mantle Network",
+  "private": true,
+  "scripts": {
+    "build": "webpack --mode production",
+    "dev": "webpack --mode development",
+    "watch": "webpack --mode development --watch",
+    "clean": "rm -rf dist",
+    "rebuild": "pnpm run clean && pnpm run build"
+  },
+  "keywords": ["blockchain", "mantle", "smart-contracts", "browser-extension", "web3"],
+  "author": "",
+  "license": "MIT",
+  "packageManager": "pnpm@10.11.1",
+  "devDependencies": {
+    "@babel/core": "^7.27.4",
+    "@babel/preset-env": "^7.27.2",
+    "@babel/preset-react": "^7.27.1",
+    "babel-loader": "^10.0.0",
+    "clean-webpack-plugin": "^4.0.0",
+    "copy-webpack-plugin": "^13.0.0",
+    "css-loader": "^7.1.2",
+    "style-loader": "^4.0.0",
+    "webpack": "^5.99.9",
+    "webpack-cli": "^6.0.1",
+    "webpack-dev-server": "^5.2.2",
+    "webpack-merge": "^6.0.1"
+  },
+  "dependencies": {
+    "@headlessui/react": "^2.2.4",
+    "@heroicons/react": "^2.2.0",
+    "axios": "^1.9.0",
+    "ethers": "^6.14.3",
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0"
+  }
+}

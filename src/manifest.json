@@ -1,0 +1,28 @@
+{
+  "manifest_version": 3,
+  "name": "ChainWhisperer MVP",
+  "version": "0.1.0",
+  "description": "AI-powered smart contract analyzer",
+  "permissions": ["storage", "activeTab"],
+  "host_permissions": [
+    "*://*.etherscan.io/*",
+    "*://*.mantlescan.xyz/*"
+  ],
+  "background": {
+    "service_worker": "background/service-worker.js"
+  },
+  "content_scripts": [{
+    "matches": [
+      "*://*.etherscan.io/address/*",
+      "*://*.mantle.xyz/address/*"
+    ],
+    "js": ["content/detector.js"],
+    "run_at": "document_idle"
+  }],
+  "action": {
+    "default_popup": "popup/popup.html",
+    "default_icon": {
+      "16": "assets/icons/icon.png"
+    }
+  }
+}
