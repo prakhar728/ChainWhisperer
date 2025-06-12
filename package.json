@@ -10,7 +10,13 @@
     "clean": "rm -rf dist",
     "rebuild": "pnpm run clean && pnpm run build"
   },
-  "keywords": ["blockchain", "mantle", "smart-contracts", "browser-extension", "web3"],
+  "keywords": [
+    "blockchain",
+    "mantle",
+    "smart-contracts",
+    "browser-extension",
+    "web3"
+  ],
   "author": "",
   "license": "MIT",
   "packageManager": "pnpm@10.11.1",
@@ -22,6 +28,8 @@
     "clean-webpack-plugin": "^4.0.0",
     "copy-webpack-plugin": "^13.0.0",
     "css-loader": "^7.1.2",
+    "dotenv": "^16.5.0",
+    "dotenv-webpack": "^8.1.0",
     "style-loader": "^4.0.0",
     "webpack": "^5.99.9",
     "webpack-cli": "^6.0.1",
