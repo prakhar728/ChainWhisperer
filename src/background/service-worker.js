@@ -5,8 +5,6 @@ const mantleAPI = new MantleAPI();
 let contractCache = new Map();
 
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
-  console.log('Background received:', request);
-  
   switch (request.type) {
     case 'CONTRACT_DETECTED':
       handleContractDetected(request, sender.tab);
@@ -48,8 +46,6 @@ async function handleContractDetected(request, tab) {
   // Store in extension storage
   chrome.storage.local.set({ currentContract: contractInfo });
   
-  console.log(fetchVerified && chain === 'mantle');
-  
   if (fetchVerified && chain === 'mantle') {
     // Notify content script that we're fetching
     if (tab?.id) {
@@ -59,15 +55,9 @@ async function handleContractDetected(request, tab) {
         message: 'Fetching contract data...'
       });
     }
-      console.log("Fetching");
-    
     try {
-      console.log("Fetching");
-      
       // Fetch verified contract data
       const verifiedData = await mantleAPI.getVerifiedContract(address);
-      
-      console.log(verifiedData);
       
       // Fetch additional data in parallel
       const [creationData] = await Promise.all([
