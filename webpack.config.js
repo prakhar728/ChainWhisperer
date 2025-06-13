@@ -55,6 +55,7 @@ module.exports = {
     }),
     new DefinePlugin({
       'process.env.MANTLE_API_KEY': JSON.stringify(process.env.MANTLE_API_KEY),
+      'process.env.NEBULA_API_KEY': JSON.stringify(process.env.NEBULA_API_KEY),
     }),
   ]
 };

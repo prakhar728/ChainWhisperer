@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { handleUserMessage } from '../services/nebula';
 
 const MANTLE_RPC = 'https://rpc.mantle.xyz';
 
@@ -13,10 +14,10 @@ function App() {
   useEffect(() => {
     // Initialize with a contextual greeting once contract is loaded
     if (contract && contractInfo && chatMessages.length === 0) {
-      const greeting = contractInfo.verified
+      const greeting = contractInfo.verified 
         ? `Hello! I'm analyzing ${contractInfo.contractName || 'this contract'}. It's verified and appears to be ${contractInfo.riskLevel === 'low' ? 'safe' : contractInfo.riskLevel === 'medium' ? 'moderately risky' : 'high risk'}. What would you like to know?`
         : `Hello! I'm ChainWhisperer. I've detected an ${contractInfo.verified ? 'verified' : 'unverified'} contract. Ask me anything about it!`;
-
+      
       setChatMessages([{ type: 'ai', content: greeting }]);
     }
   }, [contract, contractInfo]);
@@ -54,7 +55,7 @@ function App() {
         const provider = new ethers.JsonRpcProvider(MANTLE_RPC);
         const code = await provider.getCode(contractData.address);
         const balance = await provider.getBalance(contractData.address);
-
+        
         setContractInfo({
           isContract: code !== '0x',
           balance: ethers.formatEther(balance),
@@ -81,48 +82,63 @@ function App() {
   const assessRiskLevel = (contractData) => {
     // Basic risk assessment based on contract properties
     let riskScore = 0;
-
+    
     if (!contractData.verified) riskScore += 30;
     if (contractData.proxy) riskScore += 20;
     if (!contractData.optimizationUsed) riskScore += 10;
-
+    
     // Check for dangerous functions in ABI
     if (contractData.abi) {
       const dangerousFunctions = ['selfdestruct', 'delegatecall', 'suicide'];
-      const hasRiskyFunctions = contractData.abi.some(item =>
-        item.type === 'function' &&
-        dangerousFunctions.some(dangerous =>
+      const hasRiskyFunctions = contractData.abi.some(item => 
+        item.type === 'function' && 
+        dangerousFunctions.some(dangerous => 
           item.name?.toLowerCase().includes(dangerous)
         )
       );
       if (hasRiskyFunctions) riskScore += 40;
     }
-
+    
     if (riskScore >= 50) return 'high';
     if (riskScore >= 25) return 'medium';
     return 'low';
   };
 
   const handleSendMessage = async () => {
-    if (!inputMessage.trim()) return;
-
+    if (!inputMessage.trim() || !sessionId || !contract) return;
+    
     const userMessage = inputMessage.trim();
     setChatMessages(prev => [...prev, { type: 'user', content: userMessage }]);
     setInputMessage('');
     setIsTyping(true);
 
-    // Simulate AI response
-    setTimeout(() => {
-      const responses = [
-        "This is a Uniswap V3 liquidity pool contract. It's generally safe for standard trading operations.",
-        "The contract has been verified and audited. The risk level is low for basic swaps.",
-        "This function allows you to swap tokens. Make sure you understand slippage before proceeding.",
-        "The contract appears legitimate. It's a standard DEX pool with no obvious red flags."
+    try {
+      // Get chain ID for Mantle (assuming chain ID 5000)
+      const chainId = contract.chain === 'mantle' ? '5000' : '1';
+      
+      // Send message to Nebula API
+      const response = await handleUserMessage(
+        userMessage,
+        sessionId,
+        chainId,
+        contract.address
+      );
+      
+      setChatMessages(prev => [...prev, { type: 'ai', content: response }]);
+    } catch (error) {
+      console.error('Error sending message to Nebula:', error);
+      
+      // Fallback response
+      const fallbackResponses = [
+        "I'm having trouble connecting to analyze this contract. Please try again in a moment.",
+        "Sorry, I encountered an error while processing your request. Could you rephrase your question?",
+        "There seems to be a temporary issue with the AI service. Please retry your query."
       ];
-      const randomResponse = responses[Math.floor(Math.random() * responses.length)];
-      setChatMessages(prev => [...prev, { type: 'ai', content: randomResponse }]);
+      const fallbackResponse = fallbackResponses[Math.floor(Math.random() * fallbackResponses.length)];
+      setChatMessages(prev => [...prev, { type: 'ai', content: fallbackResponse }]);
+    } finally {
       setIsTyping(false);
-    }, 1500);
+    }
   };
 
   const handleKeyPress = (e) => {
@@ -322,7 +338,7 @@ function App() {
             height: '3px',
             background: 'linear-gradient(90deg, #06b6d4 0%, #10b981 100%)'
           }}></div>
-
+          
           <div style={{
             display: 'flex',
             justifyContent: 'space-between',
@@ -456,7 +472,7 @@ function App() {
                 }}
               >
                 <div style={{
-                  background: message.type === 'user'
+                  background: message.type === 'user' 
                     ? 'linear-gradient(135deg, #06b6d4 0%, #0891b2 100%)'
                     : 'rgba(51, 65, 85, 0.8)',
                   color: message.type === 'user' ? '#fff' : '#e2e8f0',
@@ -464,7 +480,7 @@ function App() {
                   borderRadius: message.type === 'user' ? '16px 16px 4px 16px' : '16px 16px 16px 4px',
                   fontSize: '14px',
                   lineHeight: '1.4',
-                  boxShadow: message.type === 'user'
+                  boxShadow: message.type === 'user' 
                     ? '0 4px 12px rgba(6, 182, 212, 0.3)'
                     : '0 2px 8px rgba(0, 0, 0, 0.2)'
                 }}>
@@ -472,7 +488,7 @@ function App() {
                 </div>
               </div>
             ))}
-
+            
             {isTyping && (
               <div style={{
                 alignSelf: 'flex-start',
@@ -532,7 +548,7 @@ function App() {
                 onClick={handleSendMessage}
                 disabled={!inputMessage.trim() || isTyping}
                 style={{
-                  background: inputMessage.trim() && !isTyping
+                  background: inputMessage.trim() && !isTyping 
                     ? 'linear-gradient(135deg, #06b6d4 0%, #0891b2 100%)'
                     : 'rgba(51, 65, 85, 0.6)',
                   color: inputMessage.trim() && !isTyping ? '#fff' : '#64748b',
