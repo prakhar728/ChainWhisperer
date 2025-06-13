@@ -294,6 +294,27 @@
   display: flex;
   flex-direction: column;
   gap: 12px;
+  max-height: 300px; /* Set a max height for scrolling */
+  scrollbar-width: thin;
+  scrollbar-color: rgba(6, 182, 212, 0.3) transparent;
+}
+
+/* Custom scrollbar for webkit browsers */
+.messages-container::-webkit-scrollbar {
+  width: 6px;
+}
+
+.messages-container::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.messages-container::-webkit-scrollbar-thumb {
+  background: rgba(6, 182, 212, 0.3);
+  border-radius: 3px;
+}
+
+.messages-container::-webkit-scrollbar-thumb:hover {
+  background: rgba(6, 182, 212, 0.5);
 }
 
 .message {
@@ -429,4 +450,109 @@
 .retry-button:hover {
   transform: translateY(-1px);
   box-shadow: 0 4px 12px rgba(6, 182, 212, 0.3);
+}
+
+/* Markdown Styles for AI Messages */
+.message-bubble.ai h1,
+.message-bubble.ai h2,
+.message-bubble.ai h3,
+.message-bubble.ai h4,
+.message-bubble.ai h5,
+.message-bubble.ai h6 {
+  color: #06b6d4;
+  margin: 8px 0 4px 0;
+  font-weight: 600;
+}
+
+.message-bubble.ai h1 { font-size: 18px; }
+.message-bubble.ai h2 { font-size: 16px; }
+.message-bubble.ai h3 { font-size: 15px; }
+.message-bubble.ai h4 { font-size: 14px; }
+
+.message-bubble.ai p {
+  margin: 4px 0;
+  line-height: 1.5;
+}
+
+.message-bubble.ai ul,
+.message-bubble.ai ol {
+  margin: 8px 0;
+  padding-left: 20px;
+}
+
+.message-bubble.ai li {
+  margin: 2px 0;
+  line-height: 1.4;
+}
+
+.message-bubble.ai code {
+  background: rgba(6, 182, 212, 0.1);
+  color: #06b6d4;
+  padding: 2px 4px;
+  border-radius: 3px;
+  font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+  font-size: 13px;
+}
+
+.message-bubble.ai pre {
+  background: rgba(15, 23, 42, 0.8);
+  color: #e2e8f0;
+  padding: 12px;
+  border-radius: 6px;
+  margin: 8px 0;
+  overflow-x: auto;
+  border-left: 3px solid #06b6d4;
+}
+
+.message-bubble.ai pre code {
+  background: none;
+  color: inherit;
+  padding: 0;
+}
+
+.message-bubble.ai blockquote {
+  border-left: 3px solid #06b6d4;
+  padding-left: 12px;
+  margin: 8px 0;
+  color: #94a3b8;
+  font-style: italic;
+}
+
+.message-bubble.ai strong {
+  color: #f8fafc;
+  font-weight: 600;
+}
+
+.message-bubble.ai em {
+  color: #cbd5e1;
+  font-style: italic;
+}
+
+.message-bubble.ai a {
+  color: #06b6d4;
+  text-decoration: underline;
+}
+
+.message-bubble.ai a:hover {
+  color: #0891b2;
+}
+
+.message-bubble.ai table {
+  border-collapse: collapse;
+  width: 100%;
+  margin: 8px 0;
+  font-size: 13px;
+}
+
+.message-bubble.ai th,
+.message-bubble.ai td {
+  border: 1px solid rgba(6, 182, 212, 0.2);
+  padding: 6px 8px;
+  text-align: left;
+}
+
+.message-bubble.ai th {
+  background: rgba(6, 182, 212, 0.1);
+  color: #06b6d4;
+  font-weight: 600;
 }

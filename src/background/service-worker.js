@@ -149,6 +149,7 @@ async function handleInitializeChatSession(request, sendResponse) {
   try {
     const { contractAddress } = request;
     const contract = contractCache.get(contractAddress) || contractCache.get('current');
+    console.log("Initalized chat");
     
     if (!contract) {
       sendResponse({ error: 'No contract found' });
@@ -164,7 +165,7 @@ async function handleInitializeChatSession(request, sendResponse) {
       contract.chain === 'mantle' ? '5000' : '1',
       sessionId
     );
-    
+
     // Store session info
     const sessionInfo = {
       sessionId,

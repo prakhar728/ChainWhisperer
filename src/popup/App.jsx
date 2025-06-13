@@ -1,15 +1,26 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
+import ReactMarkdown from 'react-markdown';
 import "./App.css";
 
 function App() {
   const [contract, setContract] = useState(null);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [contractDetails, setContractDetails] = useState(null);
   const [chatMessages, setChatMessages] = useState([]);
   const [inputMessage, setInputMessage] = useState('');
   const [isTyping, setIsTyping] = useState(false);
   const [sessionId, setSessionId] = useState(null);
   const [error, setError] = useState(null);
+  const messagesEndRef = useRef(null);
+
+  // Auto-scroll to bottom when new messages arrive
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  };
+
+  useEffect(() => {
+    scrollToBottom();
+  }, [chatMessages, isTyping]);
 
   useEffect(() => {
     initializeApp();
@@ -230,7 +241,11 @@ function App() {
             {chatMessages.map((message, index) => (
               <div key={index} className={`message ${message.type}`}>
                 <div className={`message-bubble ${message.type}`}>
-                  {message.content}
+                  {message.type === 'ai' ? (
+                    <ReactMarkdown>{message.content}</ReactMarkdown>
+                  ) : (
+                    message.content
+                  )}
                 </div>
               </div>
             ))}
@@ -242,6 +257,9 @@ function App() {
                 </div>
               </div>
             )}
+            
+            {/* Invisible element to scroll to */}
+            <div ref={messagesEndRef} />
           </div>
 
           <div className="input-section">

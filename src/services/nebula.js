@@ -70,8 +70,6 @@ async function queryContract(contractAddress, chainId, sessionId) {
   // Make the API request
   const response = await apiRequest("/chat", "POST", requestBody);
 
-  console.log(response);
-  
   return response.message; // Return the structured response from Nebula
 }
 
