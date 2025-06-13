@@ -1,151 +1,67 @@
 import React, { useState, useEffect } from 'react';
-import { createSession, handleUserMessage, queryContract } from '../services/nebula';
 import "./App.css";
-import { ethers } from 'ethers';
-
-const MANTLE_RPC = 'https://rpc.mantle.xyz';
 
 function App() {
   const [contract, setContract] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [contractInfo, setContractInfo] = useState(null);
+  const [loading, setLoading] = useState(false);
   const [contractDetails, setContractDetails] = useState(null);
   const [chatMessages, setChatMessages] = useState([]);
   const [inputMessage, setInputMessage] = useState('');
   const [isTyping, setIsTyping] = useState(false);
   const [sessionId, setSessionId] = useState(null);
+  const [error, setError] = useState(null);
 
   useEffect(() => {
-    initializeSession();
+    initializeApp();
   }, []);
 
-  const initializeSession = async () => {
+  const initializeApp = async () => {
     try {
-      // Get current contract from background service worker
-      chrome.runtime.sendMessage({ type: 'GET_CURRENT_CONTRACT' }, async (response) => {
-        if (response) {
-          setContract(response);
-          console.log("new details");
-
-          await fetchContractInfo(response);
-
-          // Create Nebula session
-          const newSessionId = await createSession(`ChainWhisperer - ${response.contractName || 'Contract'}`);
-          setSessionId(newSessionId);
-
-          const contractDetails = await queryContract(
-            response.address,
-            5000,
-            newSessionId
-          );
-
-          setContractDetails(contractDetails);
-
-          // Set initial greeting based on contract info
-          const greeting = response.verified
-            ? `Hello! I'm analyzing ${response.contractName || 'this contract'}. It's verified and appears to be safe. What would you like to know?`
-            : `Hello! I'm ChainWhisperer. I've detected a contract. Ask me anything about it!`;
-
-          setChatMessages([{ type: 'ai', content: greeting }]);
+      // Get current contract from service worker
+      const response = await chrome.runtime.sendMessage({ 
+        type: 'GET_CURRENT_CONTRACT' 
+      });
+      
+      if (response) {
+        setContract(response);
+        
+        // Initialize chat session via service worker
+        const sessionResponse = await chrome.runtime.sendMessage({
+          type: 'INITIALIZE_CHAT_SESSION',
+          contractAddress: response.address
+        });
+        
+        if (sessionResponse.success) {
+          setSessionId(sessionResponse.sessionId);
+          setContractDetails(sessionResponse.contractDetails);
+          
+          // Set initial messages
+          const initialMessages = [
+            { type: 'ai', content: sessionResponse.greeting }
+          ];
+          
+          if (sessionResponse.contractDetails) {
+            initialMessages.push({
+              type: 'ai',
+              content: sessionResponse.contractDetails
+            });
+          }
+          
+          setChatMessages(initialMessages);
         } else {
-          setLoading(false);
+          setError(sessionResponse.error);
         }
-      });
-    } catch (error) {
-      console.error('Error initializing session:', error);
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    // Initialize with a contextual greeting once contract is loaded
-    if (contract && contractInfo && chatMessages.length === 0) {
-      const greeting = contractInfo.verified
-        ? `Hello! I'm analyzing ${contractInfo.contractName || 'this contract'}. It's verified and appears to be ${contractInfo.riskLevel === 'low' ? 'safe' : contractInfo.riskLevel === 'medium' ? 'moderately risky' : 'high risk'}. What would you like to know?`
-        : `Hello! I'm ChainWhisperer. I've detected an ${contractInfo.verified ? 'verified' : 'unverified'} contract. Ask me anything about it!`;
-
-      setChatMessages([
-        { type: 'ai', content: greeting },
-        {
-        type: "ai",
-        content:
-          contractDetails || "No details available for this contract.",
-      }]);
-    }
-  }, [contract, contractDetails]);
-
-  const fetchContractInfo = async (contractData) => {
-    try {
-      // If we have verified contract data, use it directly
-      if (contractData.verified && contractData.abi) {
-        setContractInfo({
-          isContract: true,
-          balance: '0.0', // This would be fetched from RPC if needed
-          codeSize: contractData.sourceCode?.length || 0,
-          riskLevel: assessRiskLevel(contractData),
-          verified: contractData.verified,
-          contractName: contractData.contractName,
-          compiler: contractData.compilerVersion,
-          optimization: contractData.optimizationUsed,
-          proxy: contractData.proxy,
-          creation: contractData.creation,
-        });
-      } else {
-        // Fallback to basic RPC data
-        const provider = new ethers.JsonRpcProvider(MANTLE_RPC);
-        const code = await provider.getCode(contractData.address);
-        const balance = await provider.getBalance(contractData.address);
-
-        setContractInfo({
-          isContract: code !== '0x',
-          balance: ethers.formatEther(balance),
-          codeSize: (code.length - 2) / 2,
-          riskLevel: 'unknown',
-          verified: false
-        });
       }
-    } catch (error) {
-      console.error('Error fetching contract info:', error);
-      setContractInfo({
-        isContract: false,
-        balance: '0.0',
-        codeSize: 0,
-        riskLevel: 'unknown',
-        verified: false,
-        error: error.message
-      });
+    } catch (err) {
+      console.error('Error initializing app:', err);
+      setError(err.message);
     } finally {
       setLoading(false);
     }
   };
 
-  const assessRiskLevel = (contractData) => {
-    // Basic risk assessment based on contract properties
-    let riskScore = 0;
-
-    if (!contractData.verified) riskScore += 30;
-    if (contractData.proxy) riskScore += 20;
-    if (!contractData.optimizationUsed) riskScore += 10;
-
-    // Check for dangerous functions in ABI
-    if (contractData.abi) {
-      const dangerousFunctions = ['selfdestruct', 'delegatecall', 'suicide'];
-      const hasRiskyFunctions = contractData.abi.some(item =>
-        item.type === 'function' &&
-        dangerousFunctions.some(dangerous =>
-          item.name?.toLowerCase().includes(dangerous)
-        )
-      );
-      if (hasRiskyFunctions) riskScore += 40;
-    }
-
-    if (riskScore >= 50) return 'high';
-    if (riskScore >= 25) return 'medium';
-    return 'low';
-  };
-
   const handleSendMessage = async () => {
-    if (!inputMessage.trim() || !sessionId || !contract) return;
+    if (!inputMessage.trim() || !sessionId || isTyping) return;
 
     const userMessage = inputMessage.trim();
     setChatMessages(prev => [...prev, { type: 'user', content: userMessage }]);
@@ -153,29 +69,27 @@ function App() {
     setIsTyping(true);
 
     try {
-      // Get chain ID for Mantle (assuming chain ID 5000)
-      const chainId = contract.chain === 'mantle' ? '5000' : '1';
+      // Send message via service worker
+      const response = await chrome.runtime.sendMessage({
+        type: 'SEND_CHAT_MESSAGE',
+        message: userMessage,
+        sessionId: sessionId
+      });
 
-      // Send message to Nebula API
-      const response = await handleUserMessage(
-        userMessage,
-        sessionId,
-        chainId,
-        contract.address
-      );
-
-      setChatMessages(prev => [...prev, { type: 'ai', content: response }]);
-    } catch (error) {
-      console.error('Error sending message to Nebula:', error);
-
-      // Fallback response
-      const fallbackResponses = [
-        "I'm having trouble connecting to analyze this contract. Please try again in a moment.",
-        "Sorry, I encountered an error while processing your request. Could you rephrase your question?",
-        "There seems to be a temporary issue with the AI service. Please retry your query."
-      ];
-      const fallbackResponse = fallbackResponses[Math.floor(Math.random() * fallbackResponses.length)];
-      setChatMessages(prev => [...prev, { type: 'ai', content: fallbackResponse }]);
+      if (response.success) {
+        setChatMessages(prev => [...prev, { type: 'ai', content: response.response }]);
+      } else {
+        // Use fallback response if provided
+        const errorMessage = response.fallbackResponse || 
+          "Sorry, I encountered an error processing your request.";
+        setChatMessages(prev => [...prev, { type: 'ai', content: errorMessage }]);
+      }
+    } catch (err) {
+      console.error('Error sending message:', err);
+      setChatMessages(prev => [...prev, { 
+        type: 'ai', 
+        content: "I'm having trouble connecting. Please try again." 
+      }]);
     } finally {
       setIsTyping(false);
     }
@@ -188,12 +102,39 @@ function App() {
     }
   };
 
+  const getRiskColorClass = (riskLevel) => {
+    switch (riskLevel) {
+      case 'low': return 'low';
+      case 'medium': return 'medium';
+      case 'high': return 'high';
+      default: return 'unknown';
+    }
+  };
+
   if (loading) {
     return (
       <div className="loading-container">
         <div className="loading-content">
           <div className="loading-spinner"></div>
           <p>Analyzing contract...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="empty-state">
+        <div>
+          <div className="empty-icon">⚠️</div>
+          <p className="empty-title">Error Loading Contract</p>
+          <p className="empty-subtitle">{error}</p>
+          <button 
+            onClick={initializeApp}
+            className="retry-button"
+          >
+            Retry
+          </button>
         </div>
       </div>
     );
@@ -234,17 +175,17 @@ function App() {
       <div className="contract-info-section">
         <div className="contract-info-card">
           <div className="contract-info-header"></div>
-
+          
           <div className="contract-title-row">
             <h2 className="contract-title">
-              {contractInfo?.contractName || contract.contractName || 'Unknown Contract'}
+              {contract.contractName || 'Unknown Contract'}
             </h2>
             <div className="badges">
-              {contractInfo?.verified && (
+              {contract.verified && (
                 <div className="badge badge-verified">✓ Verified</div>
               )}
-              <div className={`badge-risk ${contractInfo?.riskLevel || 'unknown'}`}>
-                {contractInfo?.riskLevel || 'unknown'} Risk
+              <div className={`badge-risk ${getRiskColorClass(contract.riskLevel)}`}>
+                {contract.riskLevel || 'unknown'} Risk
               </div>
             </div>
           </div>
@@ -259,19 +200,19 @@ function App() {
             <div className="detail-item">
               <span className="detail-label">Balance:</span>
               <span className="detail-value">
-                {contractInfo?.balance || '0.0'} MNT
+                {contract.balance || '0.0'} MNT
               </span>
             </div>
             <div className="detail-item">
               <span className="detail-label">Type:</span>
               <span className="detail-value">
-                {contractInfo?.proxy ? 'Proxy Contract' : 'Smart Contract'}
+                {contract.proxy ? 'Proxy Contract' : 'Smart Contract'}
               </span>
             </div>
             <div className="detail-item">
               <span className="detail-label">Compiler:</span>
               <span className="detail-value">
-                {contractInfo?.compiler || 'Unknown'}
+                {contract.compilerVersion || 'Unknown'}
               </span>
             </div>
           </div>
@@ -293,7 +234,7 @@ function App() {
                 </div>
               </div>
             ))}
-
+            
             {isTyping && (
               <div className="typing-indicator">
                 <div className="typing-bubble">
@@ -312,11 +253,12 @@ function App() {
                 onKeyPress={handleKeyPress}
                 placeholder="Ask about this contract..."
                 className="message-input"
+                disabled={isTyping || !sessionId}
               />
               <button
                 onClick={handleSendMessage}
-                disabled={!inputMessage.trim() || isTyping}
-                className={`send-button ${inputMessage.trim() && !isTyping ? 'enabled' : 'disabled'}`}
+                disabled={!inputMessage.trim() || isTyping || !sessionId}
+                className={`send-button ${inputMessage.trim() && !isTyping && sessionId ? 'enabled' : 'disabled'}`}
               >
                 Send
               </button>
