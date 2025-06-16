@@ -11,25 +11,20 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     case 'CONTRACT_DETECTED':
       handleContractDetected(request, sender.tab);
       break;
-
     case 'GET_CURRENT_CONTRACT':
       const cached = contractCache.get(request.address || 'current');
       sendResponse(cached || null);
       break;
-
     case 'INITIALIZE_CHAT_SESSION':
       handleInitializeChatSession(request, sendResponse);
       break;
-
     case 'SEND_CHAT_MESSAGE':
       handleChatMessage(request, sendResponse);
       break;
-
     case 'OPEN_POPUP':
       chrome.action.openPopup();
       break;
   }
-
   return true; // Keep message channel open for async responses
 });
 
@@ -116,7 +111,6 @@ async function handleContractDetected(request, tab) {
       }
 
       console.log('Contract data fetched:', enrichedContract);
-
     } catch (error) {
       console.error('Error fetching contract:', error);
 
@@ -150,59 +144,131 @@ async function handleInitializeChatSession(request, sendResponse) {
     const { contractAddress } = request;
     const contract = contractCache.get(contractAddress) || contractCache.get('current');
 
-    console.log("Initalized chat");
+    console.log("Initializing chat session for:", contractAddress);
 
     if (!contract) {
       sendResponse({ error: 'No contract found' });
       return;
     }
 
-    const cachedSessionId = await chrome.storage.local.get(['sessionId']);
+    // Check for cached session for this specific contract
+    const sessionCacheKey = `session_${contractAddress}`;
+    let cachedSessionData = await chrome.storage.local.get([sessionCacheKey]);
     let sessionId = '';
-    let session = {};
+    let sessionInfo = {};
+    let chatHistory = [];
+    let contractDetails = '';
 
-    if (cachedSessionId) {
-      session = await getSession(cachedSessionId.sessionId);
+    if (cachedSessionData[sessionCacheKey]) {
+      console.log("Found cached session for contract:", contractAddress);
 
-      if (session.title.includes(contractAddress)) {
-        sessionId = session.id;
-      } else {
-    // Create Nebula session
-        sessionId = await createSession(`ChainWhisperer - ${contractAddress || 'Contract'}`);
+      const cachedSession = cachedSessionData[sessionCacheKey];
+      sessionId = cachedSession.sessionId;
 
+      try {
+        // Fetch full session data to get conversation history
+        const sessionResponse = await getSession(sessionId);
+
+        if (sessionResponse && sessionResponse.result) {
+          sessionInfo = sessionResponse.result;
+
+          // Convert history to the expected format
+          if (sessionInfo.history && sessionInfo.history.length > 0) {
+            chatHistory = sessionInfo.history.map(msg => ({
+              role: msg.role, // 'user' or 'assistant'
+              content: msg.role === 'assistant' ? msg.content :
+                (Array.isArray(msg.content) ? msg.content[0]?.text || '' : msg.content)
+            }));
+
+            // Extract the initial contract details from first assistant message
+            const firstAssistantMessage = chatHistory.find(msg => msg.role === 'assistant');
+            if (firstAssistantMessage) {
+              contractDetails = firstAssistantMessage.content;
+            }
+          }
+
+          console.log("Loaded session history:", chatHistory.length, "messages");
+
+          // Update session cache in memory
+          const sessionCacheInfo = {
+            sessionId,
+            contractAddress: contract.address,
+            chainId: contract.chain === 'mantle' ? '5000' : '1',
+            createdAt: new Date(sessionInfo.created_at).getTime(),
+            lastUsed: Date.now()
+          };
+
+          sessionCache.set(sessionId, sessionCacheInfo);
+          sessionCache.set(`contract_${contract.address}`, sessionCacheInfo);
+
+          sendResponse({
+            success: true,
+            sessionId,
+            contract,
+            contractDetails,
+            chatHistory, // Return full conversation history
+            isRestored: true,
+            greeting: "Welcome back! I've restored our previous conversation."
+          });
+          return;
+        }
+      } catch (error) {
+        console.warn("Failed to load cached session, creating new one:", error);
+        // Fall through to create new session
       }
     }
 
-    await chrome.storage.local.set({ sessionId: sessionId });
+    // Create new session if no valid cache found
+    console.log("Creating new session for contract:", contractAddress);
 
-    return;
+    sessionId = await createSession(`ChainWhisperer - ${contract.contractName || contractAddress.slice(0, 8)}`);
 
     // Query contract details using Nebula
-    const contractDetails = await queryContract(
+    contractDetails = await queryContract(
       contract.address,
       contract.chain === 'mantle' ? '5000' : '1',
       sessionId
     );
 
-    // Store session info
-    const sessionInfo = {
+    // Store session info in memory cache
+    const sessionCacheInfo = {
       sessionId,
       contractAddress: contract.address,
       chainId: contract.chain === 'mantle' ? '5000' : '1',
       createdAt: Date.now()
     };
 
-    sessionCache.set(sessionId, sessionInfo);
-    sessionCache.set(`contract_${contract.address}`, sessionInfo);
+    sessionCache.set(sessionId, sessionCacheInfo);
+    sessionCache.set(`contract_${contract.address}`, sessionCacheInfo);
 
-    // Generate initial greeting based on contract data
+    // Cache session in extension storage
+    await chrome.storage.local.set({
+      [sessionCacheKey]: {
+        sessionId,
+        contractAddress: contract.address,
+        chainId: contract.chain === 'mantle' ? '5000' : '1',
+        createdAt: Date.now(),
+        cached_at: Date.now()
+      }
+    });
+
+    // Prepare initial chat history
     const greeting = generateInitialGreeting(contract);
+    chatHistory = [
+      { role: 'assistant', content: greeting }
+    ];
+
+    if (contractDetails) {
+      chatHistory.push({ role: 'assistant', content: contractDetails });
+    }
 
     sendResponse({
       success: true,
       sessionId,
       contract,
       contractDetails,
+      chatHistory,
+      isRestored: false,
       greeting
     });
 
@@ -214,7 +280,6 @@ async function handleInitializeChatSession(request, sendResponse) {
 
 async function handleChatMessage(request, sendResponse) {
   try {
-
     const { message, sessionId } = request;
     const sessionInfo = sessionCache.get(sessionId);
 
@@ -230,6 +295,10 @@ async function handleChatMessage(request, sendResponse) {
       sessionInfo.chainId,
       sessionInfo.contractAddress
     );
+
+    // Update last used timestamp
+    sessionInfo.lastUsed = Date.now();
+    sessionCache.set(sessionId, sessionInfo);
 
     sendResponse({
       success: true,
@@ -309,7 +378,6 @@ async function fetchContractBalance(address, chain = 'mantle') {
     const data = await response.json();
     const balanceWei = BigInt(data.result || '0');
     const balanceEth = Number(balanceWei) / Math.pow(10, 18);
-
     return balanceEth.toFixed(4);
   } catch (error) {
     console.error('Error fetching balance:', error);
@@ -328,17 +396,27 @@ setInterval(() => {
     }
   }
 
-  // Clear old session cache
+  // Clear old session cache (keep sessions for 24 hours)
+  const oneDayAgo = Date.now() - (24 * 60 * 60 * 1000);
   for (const [key, session] of sessionCache.entries()) {
-    if (session.createdAt < oneHourAgo) {
+    if ((session.createdAt || session.lastUsed || 0) < oneDayAgo) {
       sessionCache.delete(key);
     }
   }
 }, 5 * 60 * 1000); // Every 5 minutes
 
-// Handle extension startup
-chrome.runtime.onStartup.addListener(() => {
-  console.log('ChainWhisperer extension started');
+// Handle extension startup - restore session cache
+chrome.runtime.onStartup.addListener(async () => {
+  console.log('ChainWhisperer extension started - restoring session cache');
+
+  // Restore session cache from storage
+  const allStorage = await chrome.storage.local.get();
+  Object.entries(allStorage).forEach(([key, value]) => {
+    if (key.startsWith('session_') && value.sessionId) {
+      sessionCache.set(value.sessionId, value);
+      sessionCache.set(`contract_${value.contractAddress}`, value);
+    }
+  });
 });
 
 // Handle extension installation

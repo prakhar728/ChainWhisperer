@@ -5,12 +5,14 @@ import "./App.css";
 function App() {
   const [contract, setContract] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [loadingMessage, setLoadingMessage] = useState('Analyzing contract...');
   const [contractDetails, setContractDetails] = useState(null);
   const [chatMessages, setChatMessages] = useState([]);
   const [inputMessage, setInputMessage] = useState('');
   const [isTyping, setIsTyping] = useState(false);
   const [sessionId, setSessionId] = useState(null);
   const [error, setError] = useState(null);
+  const [isRestored, setIsRestored] = useState(false);
   const messagesEndRef = useRef(null);
 
   // Auto-scroll to bottom when new messages arrive
@@ -28,37 +30,46 @@ function App() {
 
   const initializeApp = async () => {
     try {
+      setLoadingMessage('Getting contract data...');
+
       // Get current contract from service worker
-      const response = await chrome.runtime.sendMessage({ 
-        type: 'GET_CURRENT_CONTRACT' 
+      const response = await chrome.runtime.sendMessage({
+        type: 'GET_CURRENT_CONTRACT'
       });
-      
+
       if (response) {
         setContract(response);
-        
+        setLoadingMessage(isRestored ? 'Restoring conversation...' : 'Analyzing contract functions...');
+
         // Initialize chat session via service worker
         const sessionResponse = await chrome.runtime.sendMessage({
           type: 'INITIALIZE_CHAT_SESSION',
           contractAddress: response.address
         });
-        
+
         if (sessionResponse.success) {
           setSessionId(sessionResponse.sessionId);
           setContractDetails(sessionResponse.contractDetails);
-          
-          // Set initial messages
-          const initialMessages = [
-            { type: 'ai', content: sessionResponse.greeting }
-          ];
-          
-          if (sessionResponse.contractDetails) {
-            initialMessages.push({
-              type: 'ai',
-              content: sessionResponse.contractDetails
-            });
+          setIsRestored(sessionResponse.isRestored || false);
+
+          // Set messages from restored chat history or create initial messages
+          if (sessionResponse.chatHistory && sessionResponse.chatHistory.length > 0) {
+            setChatMessages(sessionResponse.chatHistory);
+          } else {
+            // Fallback to single greeting if no history
+            const initialMessages = [
+              { role: 'assistant', content: sessionResponse.greeting }
+            ];
+
+            if (sessionResponse.contractDetails) {
+              initialMessages.push({
+                role: 'assistant',
+                content: sessionResponse.contractDetails
+              });
+            }
+
+            setChatMessages(initialMessages);
           }
-          
-          setChatMessages(initialMessages);
         } else {
           setError(sessionResponse.error);
         }
@@ -75,7 +86,7 @@ function App() {
     if (!inputMessage.trim() || !sessionId || isTyping) return;
 
     const userMessage = inputMessage.trim();
-    setChatMessages(prev => [...prev, { type: 'user', content: userMessage }]);
+    setChatMessages(prev => [...prev, { role: 'user', content: userMessage }]);
     setInputMessage('');
     setIsTyping(true);
 
@@ -88,18 +99,18 @@ function App() {
       });
 
       if (response.success) {
-        setChatMessages(prev => [...prev, { type: 'ai', content: response.response }]);
+        setChatMessages(prev => [...prev, { role: 'assistant', content: response.response }]);
       } else {
         // Use fallback response if provided
-        const errorMessage = response.fallbackResponse || 
+        const errorMessage = response.fallbackResponse ||
           "Sorry, I encountered an error processing your request.";
-        setChatMessages(prev => [...prev, { type: 'ai', content: errorMessage }]);
+        setChatMessages(prev => [...prev, { role: 'assistant', content: errorMessage }]);
       }
     } catch (err) {
       console.error('Error sending message:', err);
-      setChatMessages(prev => [...prev, { 
-        type: 'ai', 
-        content: "I'm having trouble connecting. Please try again." 
+      setChatMessages(prev => [...prev, {
+        role: 'assistant',
+        content: "I'm having trouble connecting. Please try again."
       }]);
     } finally {
       setIsTyping(false);
@@ -127,7 +138,12 @@ function App() {
       <div className="loading-container">
         <div className="loading-content">
           <div className="loading-spinner"></div>
-          <p>Analyzing contract...</p>
+          <p>{loadingMessage}</p>
+          {isRestored && (
+            <p style={{ fontSize: '12px', color: '#64748b', marginTop: '8px' }}>
+              Restoring previous conversation...
+            </p>
+          )}
         </div>
       </div>
     );
@@ -140,7 +156,7 @@ function App() {
           <div className="empty-icon">⚠️</div>
           <p className="empty-title">Error Loading Contract</p>
           <p className="empty-subtitle">{error}</p>
-          <button 
+          <button
             onClick={initializeApp}
             className="retry-button"
           >
@@ -186,7 +202,7 @@ function App() {
       <div className="contract-info-section">
         <div className="contract-info-card">
           <div className="contract-info-header"></div>
-          
+
           <div className="contract-title-row">
             <h2 className="contract-title">
               {contract.contractName || 'Unknown Contract'}
@@ -234,14 +250,26 @@ function App() {
       <div className="chat-section">
         <div className="chat-container">
           <div className="chat-header">
-            <h3 className="chat-title">💬 AI Assistant</h3>
+            <h3 className="chat-title">
+              💬 AI Assistant
+              {isRestored && (
+                <span style={{
+                  fontSize: '11px',
+                  color: '#10b981',
+                  marginLeft: '8px',
+                  fontWeight: 'normal'
+                }}>
+                  (Conversation Restored)
+                </span>
+              )}
+            </h3>
           </div>
 
           <div className="messages-container">
             {chatMessages.map((message, index) => (
-              <div key={index} className={`message ${message.type}`}>
-                <div className={`message-bubble ${message.type}`}>
-                  {message.type === 'ai' ? (
+              <div key={index} className={`message ${message.role}`}>
+                <div className={`message-bubble ${message.role}`}>
+                  {message.role === 'assistant' ? (
                     <ReactMarkdown>{message.content}</ReactMarkdown>
                   ) : (
                     message.content
@@ -249,7 +277,7 @@ function App() {
                 </div>
               </div>
             ))}
-            
+
             {isTyping && (
               <div className="typing-indicator">
                 <div className="typing-bubble">
@@ -257,7 +285,7 @@ function App() {
                 </div>
               </div>
             )}
-            
+
             {/* Invisible element to scroll to */}
             <div ref={messagesEndRef} />
           </div>

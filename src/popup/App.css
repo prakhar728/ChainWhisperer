@@ -2,28 +2,62 @@
 
 /* Animations */
 @keyframes spin {
-  0% { transform: rotate(0deg); }
-  100% { transform: rotate(360deg); }
+  0% {
+    transform: rotate(0deg);
+  }
+
+  100% {
+    transform: rotate(360deg);
+  }
 }
 
 @keyframes float {
-  0%, 100% { transform: translateY(0px) rotate(0deg); }
-  50% { transform: translateY(-10px) rotate(1deg); }
+
+  0%,
+  100% {
+    transform: translateY(0px) rotate(0deg);
+  }
+
+  50% {
+    transform: translateY(-10px) rotate(1deg);
+  }
 }
 
 @keyframes glow {
-  0%, 100% { box-shadow: 0 0 20px rgba(6, 182, 212, 0.3); }
-  50% { box-shadow: 0 0 30px rgba(6, 182, 212, 0.6); }
+
+  0%,
+  100% {
+    box-shadow: 0 0 20px rgba(6, 182, 212, 0.3);
+  }
+
+  50% {
+    box-shadow: 0 0 30px rgba(6, 182, 212, 0.6);
+  }
 }
 
 @keyframes fadeIn {
-  0% { opacity: 0; transform: translateY(10px); }
-  100% { opacity: 1; transform: translateY(0); }
+  0% {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 @keyframes typing {
-  0%, 60%, 100% { opacity: 1; }
-  30% { opacity: 0.3; }
+
+  0%,
+  60%,
+  100% {
+    opacity: 1;
+  }
+
+  30% {
+    opacity: 0.3;
+  }
 }
 
 /* Base Container */
@@ -46,8 +80,8 @@
   left: 0;
   right: 0;
   bottom: 0;
-  background: radial-gradient(circle at 20% 50%, rgba(6, 182, 212, 0.1) 0%, transparent 50%), 
-              radial-gradient(circle at 80% 20%, rgba(16, 185, 129, 0.1) 0%, transparent 50%);
+  background: radial-gradient(circle at 20% 50%, rgba(6, 182, 212, 0.1) 0%, transparent 50%),
+    radial-gradient(circle at 80% 20%, rgba(16, 185, 129, 0.1) 0%, transparent 50%);
   animation: float 6s ease-in-out infinite;
   pointer-events: none;
 }
@@ -294,7 +328,8 @@
   display: flex;
   flex-direction: column;
   gap: 12px;
-  max-height: 300px; /* Set a max height for scrolling */
+  max-height: 300px;
+  /* Set a max height for scrolling */
   scrollbar-width: thin;
   scrollbar-color: rgba(6, 182, 212, 0.3) transparent;
 }
@@ -326,7 +361,7 @@
   align-self: flex-end;
 }
 
-.message.ai {
+.message.assistant {
   align-self: flex-start;
 }
 
@@ -343,7 +378,7 @@
   box-shadow: 0 4px 12px rgba(6, 182, 212, 0.3);
 }
 
-.message-bubble.ai {
+.message-bubble.assistant {
   background: rgba(51, 65, 85, 0.8);
   color: #e2e8f0;
   border-radius: 16px 16px 16px 4px;
@@ -452,40 +487,51 @@
   box-shadow: 0 4px 12px rgba(6, 182, 212, 0.3);
 }
 
-/* Markdown Styles for AI Messages */
-.message-bubble.ai h1,
-.message-bubble.ai h2,
-.message-bubble.ai h3,
-.message-bubble.ai h4,
-.message-bubble.ai h5,
-.message-bubble.ai h6 {
+/* Markdown Styles for Assistant Messages */
+.message-bubble.assistant h1,
+.message-bubble.assistant h2,
+.message-bubble.assistant h3,
+.message-bubble.assistant h4,
+.message-bubble.assistant h5,
+.message-bubble.assistant h6 {
   color: #06b6d4;
   margin: 8px 0 4px 0;
   font-weight: 600;
 }
 
-.message-bubble.ai h1 { font-size: 18px; }
-.message-bubble.ai h2 { font-size: 16px; }
-.message-bubble.ai h3 { font-size: 15px; }
-.message-bubble.ai h4 { font-size: 14px; }
+.message-bubble.assistant h1 {
+  font-size: 18px;
+}
 
-.message-bubble.ai p {
+.message-bubble.assistant h2 {
+  font-size: 16px;
+}
+
+.message-bubble.assistant h3 {
+  font-size: 15px;
+}
+
+.message-bubble.assistant h4 {
+  font-size: 14px;
+}
+
+.message-bubble.assistant p {
   margin: 4px 0;
   line-height: 1.5;
 }
 
-.message-bubble.ai ul,
-.message-bubble.ai ol {
+.message-bubble.assistant ul,
+.message-bubble.assistant ol {
   margin: 8px 0;
   padding-left: 20px;
 }
 
-.message-bubble.ai li {
+.message-bubble.assistant li {
   margin: 2px 0;
   line-height: 1.4;
 }
 
-.message-bubble.ai code {
+.message-bubble.assistant code {
   background: rgba(6, 182, 212, 0.1);
   color: #06b6d4;
   padding: 2px 4px;
@@ -494,7 +540,7 @@
   font-size: 13px;
 }
 
-.message-bubble.ai pre {
+.message-bubble.assistant pre {
   background: rgba(15, 23, 42, 0.8);
   color: #e2e8f0;
   padding: 12px;
@@ -504,13 +550,13 @@
   border-left: 3px solid #06b6d4;
 }
 
-.message-bubble.ai pre code {
+.message-bubble.assistant pre code {
   background: none;
   color: inherit;
   padding: 0;
 }
 
-.message-bubble.ai blockquote {
+.message-bubble.assistant blockquote {
   border-left: 3px solid #06b6d4;
   padding-left: 12px;
   margin: 8px 0;
@@ -518,40 +564,40 @@
   font-style: italic;
 }
 
-.message-bubble.ai strong {
+.message-bubble.assistant strong {
   color: #f8fafc;
   font-weight: 600;
 }
 
-.message-bubble.ai em {
+.message-bubble.assistant em {
   color: #cbd5e1;
   font-style: italic;
 }
 
-.message-bubble.ai a {
+.message-bubble.assistant a {
   color: #06b6d4;
   text-decoration: underline;
 }
 
-.message-bubble.ai a:hover {
+.message-bubble.assistant a:hover {
   color: #0891b2;
 }
 
-.message-bubble.ai table {
+.message-bubble.assistant table {
   border-collapse: collapse;
   width: 100%;
   margin: 8px 0;
   font-size: 13px;
 }
 
-.message-bubble.ai th,
-.message-bubble.ai td {
+.message-bubble.assistant th,
+.message-bubble.assistant td {
   border: 1px solid rgba(6, 182, 212, 0.2);
   padding: 6px 8px;
   text-align: left;
 }
 
-.message-bubble.ai th {
+.message-bubble.assistant th {
   background: rgba(6, 182, 212, 0.1);
   color: #06b6d4;
   font-weight: 600;
