@@ -92,6 +92,12 @@ async function handleUserMessage(
   return response.message; // Nebula's reply
 }
 
+async function getSession(sessionId) {
+  const response = await apiRequest(`/session/${sessionId}`, "GET");
+
+  return response; // Returns session
+}
+
 async function updateSession(sessionId, title, isPublic) {
   const requestBody = {
     title,
@@ -161,6 +167,7 @@ export {
   createSession,
   queryContract,
   handleUserMessage,
+  getSession,
   updateSession,
   clearSession,
   deleteSession,
