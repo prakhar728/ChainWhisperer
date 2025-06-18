@@ -1,8 +1,9 @@
 // src/background/service-worker.js
 import MantleAPI from '../services/mantleAPI.js';
 import { createSession, getSession, handleUserMessage, queryContract } from '../services/nebula.js';
+import { getChainId } from '../utils.js';
 
-const mantleAPI = new MantleAPI();
+let mantleAPI;
 let contractCache = new Map();
 let sessionCache = new Map();
 
@@ -30,7 +31,10 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 
 async function handleContractDetected(request, tab) {
   const { address, chain, fetchVerified } = request;
+  const chainId = getChainId(chain);
 
+  mantleAPI = mantleAPI ? mantleAPI : new MantleAPI(undefined, chainId);
+  
   // Store basic info immediately
   const contractInfo = {
     address,
@@ -51,7 +55,8 @@ async function handleContractDetected(request, tab) {
   // Store in extension storage
   chrome.storage.local.set({ currentContract: contractInfo });
 
-  if (fetchVerified && chain === 'mantle') {
+  if (fetchVerified && (chain === 'mantle' || chain === 'mantle-sepolia')) {
+
     // Notify content script that we're fetching
     if (tab?.id) {
       chrome.tabs.sendMessage(tab.id, {
@@ -189,11 +194,15 @@ async function handleInitializeChatSession(request, sendResponse) {
 
           console.log("Loaded session history:", chatHistory.length, "messages");
 
+          console.log(contract.chain);
+
+          const chainId = getChainId(contract.chain);
+
           // Update session cache in memory
           const sessionCacheInfo = {
             sessionId,
             contractAddress: contract.address,
-            chainId: contract.chain === 'mantle' ? '5000' : '1',
+            chainId: chainId,
             createdAt: new Date(sessionInfo.created_at).getTime(),
             lastUsed: Date.now()
           };
@@ -222,11 +231,14 @@ async function handleInitializeChatSession(request, sendResponse) {
     console.log("Creating new session for contract:", contractAddress);
 
     sessionId = await createSession(`ChainWhisperer - ${contract.contractName || contractAddress.slice(0, 8)}`);
+    console.log(contract.chain);
+
+    const chainId = getChainId(contract.chain);
 
     // Query contract details using Nebula
     contractDetails = await queryContract(
       contract.address,
-      contract.chain === 'mantle' ? '5000' : '1',
+      chainId,
       sessionId
     );
 
@@ -234,7 +246,7 @@ async function handleInitializeChatSession(request, sendResponse) {
     const sessionCacheInfo = {
       sessionId,
       contractAddress: contract.address,
-      chainId: contract.chain === 'mantle' ? '5000' : '1',
+      chainId: chainId,
       createdAt: Date.now()
     };
 
@@ -246,7 +258,7 @@ async function handleInitializeChatSession(request, sendResponse) {
       [sessionCacheKey]: {
         sessionId,
         contractAddress: contract.address,
-        chainId: contract.chain === 'mantle' ? '5000' : '1',
+        chainId: chainId,
         createdAt: Date.now(),
         cached_at: Date.now()
       }

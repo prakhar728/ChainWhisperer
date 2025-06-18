@@ -7,22 +7,30 @@ class ContractDetector {
   }
 
   detectContract() {
+    console.log("no contract detected");
+    
     const url = window.location.href;
     const addressMatch = url.match(/address\/(0x[a-fA-F0-9]{40})/);
-    
+
     if (addressMatch) {
       this.contractAddress = addressMatch[1];
+      let chain = 'ethereum';
 
+      if (url.includes('sepolia.mantlescan.xyz') || url.includes('sepolia.mantle.xyz')) {
+        chain = 'mantle-sepolia';
+      } else if (url.includes('mantlescan.xyz') || url.includes('mantle.xyz')) {
+        chain = 'mantle';
+      }
       chrome.runtime.sendMessage({
         type: 'CONTRACT_DETECTED',
         address: this.contractAddress,
-        chain: url.includes('mantle') ? 'mantle' : 'ethereum',
+        chain: chain,
         fetchVerified: true // New flag to trigger immediate fetch
       });
 
       // Add visual indicator
       this.addIndicator();
-      
+
       // Also try to extract some info from the page
       this.extractPageInfo();
     }
@@ -33,7 +41,7 @@ class ContractDetector {
     setTimeout(() => {
       const contractNameElement = document.querySelector('.text-secondary.small');
       const contractName = contractNameElement?.textContent?.trim();
-      
+
       if (contractName) {
         chrome.runtime.sendMessage({
           type: 'CONTRACT_PAGE_INFO',
@@ -66,7 +74,7 @@ class ContractDetector {
       font-family: sans-serif;
       box-shadow: 0 4px 6px rgba(0,0,0,0.1);
     `;
-    
+
     // Add spinning animation
     const style = document.createElement('style');
     style.textContent = `
@@ -75,11 +83,11 @@ class ContractDetector {
       }
     `;
     document.head.appendChild(style);
-    
+
     indicator.onclick = () => {
       chrome.runtime.sendMessage({ type: 'OPEN_POPUP' });
     };
-    
+
     document.body.appendChild(indicator);
   }
 

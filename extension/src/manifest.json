@@ -14,7 +14,8 @@
   "content_scripts": [{
     "matches": [
       "*://*.etherscan.io/address/*",
-      "*://*.mantle.xyz/address/*"
+      "*://*.mantle.xyz/address/*",
+      "*://*.mantlescan.xyz/address/*"
     ],
     "js": ["content/detector.js"],
     "run_at": "document_idle"

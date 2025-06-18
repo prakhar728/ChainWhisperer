@@ -31,6 +31,7 @@ export class MantleAPI {
       
       // Parse the result
       const contractData = data.result[0];
+      console.log(contractData);
       
       return {
         verified: true,
