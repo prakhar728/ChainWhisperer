@@ -1,7 +1,7 @@
 const DEFAULT_MANTLE_MAINNET = 'https://api.mantlescan.xyz/api';
-const DEFAULT_MANTLE_SEPOLIA = 'https://api-sepolia.mantlescan.xyz/api'; // Assumes this is the testnet URL
+const DEFAULT_MANTLE_SEPOLIA = 'https://api-sepolia.mantlescan.xyz/api';
 
-const MANTLE_API_KEY = process.env.MANTLE_API_KEY; // You'll need to get this from Mantlescan
+const MANTLE_API_KEY = process.env.MANTLE_API_KEY;
 
 export class MantleAPI {
   constructor(apiKey = MANTLE_API_KEY, chainId = 5000) {
@@ -38,8 +38,7 @@ export class MantleAPI {
       
       // Parse the result
       const contractData = data.result[0];
-      console.log(contractData);
-      
+
       return {
         verified: true,
         address,
@@ -48,8 +47,8 @@ export class MantleAPI {
         optimizationUsed: contractData.OptimizationUsed === '1',
         runs: parseInt(contractData.Runs) || 200,
         sourceCode: contractData.SourceCode,
-        abi: contractData.ABI ? JSON.parse(contractData.ABI) : null,
-        constructorArguments: contractData.ConstructorArguments,
+        abi: contractData.ABI && contractData.ABI != "Contract source code not verified" ? JSON.parse(contractData.ABI) : null,
+        constructorArguments: contractData.ConstructorArguments || "",
         evmVersion: contractData.EVMVersion,
         library: contractData.Library,
         licenseType: contractData.LicenseType,
@@ -107,6 +106,28 @@ export class MantleAPI {
       return null;
     }
   }
+
+  async getBytecode(address) {
+  const response = await fetch('https://rpc.sepolia.mantle.xyz', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      jsonrpc: '2.0',
+      method: 'eth_getCode',
+      params: [address, 'latest'],
+      id: 1
+    })
+  });
+
+  const { result } = await response.json();
+
+  if (!result || result === '0x') {
+    throw new Error(`No bytecode found at address ${address}`);
+  }
+
+  return result; // hex string
+}
+
 }
 
 export default MantleAPI;

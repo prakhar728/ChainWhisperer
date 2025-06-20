@@ -1,4 +1,5 @@
 // src/background/service-worker.js
+import { fetchDecompiledCode, fetchDecompiledSource } from '../services/DeDaub.js';
 import MantleAPI from '../services/mantleAPI.js';
 import { createSession, getSession, handleUserMessage, queryRawContract } from '../services/nebula.js';
 import { getChainId } from '../utils.js';
@@ -234,6 +235,14 @@ async function handleInitializeChatSession(request, sendResponse) {
     sessionId = await createSession(`ChainWhisperer - ${contract.contractName || contractAddress.slice(0, 8)}`);
 
     const chainId = getChainId(contract.chain);
+
+    const bytecode = await mantleAPI.getBytecode(contract.address);
+    console.log(bytecode);
+
+    const decompiled = await fetchDecompiledSource(bytecode);
+    console.log(`[DECOMPILED] for ${contract.address}:\n`, decompiled);
+
+    return;
     const verifiedData = await mantleAPI.getVerifiedContract(contract.address);
 
     const isActuallyVerified =
@@ -246,6 +255,17 @@ async function handleInitializeChatSession(request, sendResponse) {
       verifiedData.abi = null;
       verifiedData.sourceCode = null;
       verifiedData.message = 'Contract not verified oopsie';
+
+      try {
+        const bytecode = await mantleAPI.getBytecode(contract.address);
+        console.log(bytecode);
+
+        const decompiled = await fetchDecompiledSource(bytecode);
+        console.log(`[DECOMPILED] for ${contract.address}:\n`, decompiled);
+      } catch (err) {
+        console.warn(`Failed to decompile bytecode for ${contract.address}:`, err.message);
+      }
+
     }
 
     contractDetails = '';

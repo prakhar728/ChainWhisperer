@@ -75,8 +75,6 @@ async function queryContract(contractAddress, chainId, sessionId) {
 
 // Query contract without using context_filter
 async function queryRawContract(contractAddress, contractCode, chainId, sessionId) {
-  console.log(contractCode);
-  
   const message = `
     Analyze the following smart contract code and provide a structured list of all functions it contains. Also include high-level metadata about the contract. Use the code below as your reference:
 
