@@ -74,3 +74,5 @@ Unverified Vulnerable Contract:
 
 Verified Secure Vault:
 0x43BafD5F20d1F89d8ACEA7b1FD4Da562fd322935
+
+Vulnerable2: 0xA6919BaA319Ee57a3fbb978C3efD60b332218966
