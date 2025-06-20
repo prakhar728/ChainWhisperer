@@ -73,6 +73,52 @@ async function queryContract(contractAddress, chainId, sessionId) {
   return response.message; // Return the structured response from Nebula
 }
 
+// Query contract without using context_filter
+async function queryRawContract(contractAddress, contractCode, chainId, sessionId) {
+  console.log(contractCode);
+  
+  const message = `
+    Analyze the following smart contract code and provide a structured list of all functions it contains. Also include high-level metadata about the contract. Use the code below as your reference:
+
+    ${contractCode}
+
+    Your response must strictly follow this format:
+
+    ### Contract Details:
+    - **Name:** <contractName>
+    - **Address:** ${contractAddress}
+    - **Chain ID:** ${chainId}
+    - **Blockchain:** <blockchainName>
+
+    ### Read-only Functions:
+    1. **\`<functionName(parameters)\`**
+      - **Returns:** <returnType> (e.g., uint256, string, bool, etc.)
+      - **Description:** <brief description of what the function does>
+
+    ### Write-able Functions:
+    1. **\`<functionName(parameters)\`**
+      - **Returns:** <returnType> (if applicable)
+      - **Description:** <brief description of what the function does>
+      - **Payable:** <true/false> (if the function can accept Ether).
+      - **Parameters:** <parameterName> <parameterType> <parameterDescription>
+
+    If no functions exist in a category, include the section with "None available." Ensure the response is accurate, concise, and excludes unrelated details. If the contract implements interfaces (e.g., ERC20, ERC721), include their functions as well.
+
+  `.trim();
+
+  const requestBody = {
+    message,
+    session_id: sessionId
+    // No context_filter
+  };
+
+  console.log("Query Raw Contract Request Body:", requestBody);
+
+  const response = await apiRequest("/chat", "POST", requestBody);
+  return response.message;
+}
+
+
 // Handle user messages (follow-up questions)
 async function handleUserMessage(
   userMessage,
@@ -166,6 +212,7 @@ async function executeCommand(
 export {
   createSession,
   queryContract,
+  queryRawContract,
   handleUserMessage,
   getSession,
   updateSession,

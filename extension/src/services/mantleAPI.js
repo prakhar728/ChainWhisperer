@@ -1,10 +1,17 @@
-const MANTLE_API_BASE = 'https://api.mantlescan.xyz/api';
+const DEFAULT_MANTLE_MAINNET = 'https://api.mantlescan.xyz/api';
+const DEFAULT_MANTLE_SEPOLIA = 'https://api-sepolia.mantlescan.xyz/api'; // Assumes this is the testnet URL
+
 const MANTLE_API_KEY = process.env.MANTLE_API_KEY; // You'll need to get this from Mantlescan
 
 export class MantleAPI {
-  constructor(apiKey = MANTLE_API_KEY) {
+  constructor(apiKey = MANTLE_API_KEY, chainId = 5000) {
+    
     this.apiKey = apiKey;
-    this.baseUrl = MANTLE_API_BASE;
+    this.baseUrl = chainId == 5000
+      ? DEFAULT_MANTLE_MAINNET
+      : chainId == 5003
+      ? DEFAULT_MANTLE_SEPOLIA
+      : DEFAULT_MANTLE_MAINNET;
   }
 
   async getVerifiedContract(address) {

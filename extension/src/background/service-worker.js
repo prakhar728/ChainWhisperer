@@ -1,6 +1,6 @@
 // src/background/service-worker.js
 import MantleAPI from '../services/mantleAPI.js';
-import { createSession, getSession, handleUserMessage, queryContract } from '../services/nebula.js';
+import { createSession, getSession, handleUserMessage, queryRawContract } from '../services/nebula.js';
 import { getChainId } from '../utils.js';
 
 let mantleAPI;
@@ -34,7 +34,7 @@ async function handleContractDetected(request, tab) {
   const chainId = getChainId(chain);
 
   mantleAPI = mantleAPI ? mantleAPI : new MantleAPI(undefined, chainId);
-  
+
   // Store basic info immediately
   const contractInfo = {
     address,
@@ -77,6 +77,17 @@ async function handleContractDetected(request, tab) {
 
       // Assess risk level
       const riskLevel = assessRiskLevel(verifiedData);
+
+      const isActuallyVerified = verifiedData.abi !== null && verifiedData.abi !== "Contract source code not verified";
+
+      if (!isActuallyVerified) {
+        verifiedData.verified = false;
+        verifiedData.contractName = verifiedData.contractName || 'Unknown';
+        verifiedData.abi = null;
+        verifiedData.sourceCode = null;
+        verifiedData.message = 'Contract not verified oopsie';
+      }
+
 
       // Update contract info
       const enrichedContract = {
@@ -171,38 +182,30 @@ async function handleInitializeChatSession(request, sendResponse) {
       sessionId = cachedSession.sessionId;
 
       try {
-        // Fetch full session data to get conversation history
         const sessionResponse = await getSession(sessionId);
 
         if (sessionResponse && sessionResponse.result) {
           sessionInfo = sessionResponse.result;
 
-          // Convert history to the expected format
           if (sessionInfo.history && sessionInfo.history.length > 0) {
             chatHistory = sessionInfo.history.map(msg => ({
-              role: msg.role, // 'user' or 'assistant'
+              role: msg.role,
               content: msg.role === 'assistant' ? msg.content :
                 (Array.isArray(msg.content) ? msg.content[0]?.text || '' : msg.content)
             }));
 
-            // Extract the initial contract details from first assistant message
             const firstAssistantMessage = chatHistory.find(msg => msg.role === 'assistant');
             if (firstAssistantMessage) {
               contractDetails = firstAssistantMessage.content;
             }
           }
 
-          console.log("Loaded session history:", chatHistory.length, "messages");
-
-          console.log(contract.chain);
-
           const chainId = getChainId(contract.chain);
 
-          // Update session cache in memory
           const sessionCacheInfo = {
             sessionId,
             contractAddress: contract.address,
-            chainId: chainId,
+            chainId,
             createdAt: new Date(sessionInfo.created_at).getTime(),
             lastUsed: Date.now()
           };
@@ -215,7 +218,7 @@ async function handleInitializeChatSession(request, sendResponse) {
             sessionId,
             contract,
             contractDetails,
-            chatHistory, // Return full conversation history
+            chatHistory,
             isRestored: true,
             greeting: "Welcome back! I've restored our previous conversation."
           });
@@ -223,61 +226,78 @@ async function handleInitializeChatSession(request, sendResponse) {
         }
       } catch (error) {
         console.warn("Failed to load cached session, creating new one:", error);
-        // Fall through to create new session
       }
     }
 
-    // Create new session if no valid cache found
+    // No valid cache — create new session
     console.log("Creating new session for contract:", contractAddress);
-
     sessionId = await createSession(`ChainWhisperer - ${contract.contractName || contractAddress.slice(0, 8)}`);
-    console.log(contract.chain);
 
     const chainId = getChainId(contract.chain);
+    const verifiedData = await mantleAPI.getVerifiedContract(contract.address);
 
-    // Query contract details using Nebula
-    contractDetails = await queryContract(
-      contract.address,
-      chainId,
-      sessionId
-    );
+    const isActuallyVerified =
+      verifiedData.abi !== null &&
+      verifiedData.abi !== "Contract source code not verified";
 
-    // Store session info in memory cache
+    if (!isActuallyVerified) {
+      verifiedData.verified = false;
+      verifiedData.contractName = verifiedData.contractName || 'Unknown';
+      verifiedData.abi = null;
+      verifiedData.sourceCode = null;
+      verifiedData.message = 'Contract not verified oopsie';
+    }
+
+    contractDetails = '';
+
+
+    if (isActuallyVerified) {
+      contractDetails = await queryRawContract(
+        contract.address,
+        verifiedData.sourceCode,
+        chainId,
+        sessionId
+      );
+    } else {
+      contractDetails = '⚠️ Contract not verified oopsie.\n\n';
+    }
+
+    const updatedContract = {
+      ...contract,
+      ...verifiedData,
+      verified: isActuallyVerified
+    };
+
     const sessionCacheInfo = {
       sessionId,
-      contractAddress: contract.address,
-      chainId: chainId,
+      contractAddress: updatedContract.address,
+      chainId,
       createdAt: Date.now()
     };
 
     sessionCache.set(sessionId, sessionCacheInfo);
-    sessionCache.set(`contract_${contract.address}`, sessionCacheInfo);
+    sessionCache.set(`contract_${updatedContract.address}`, sessionCacheInfo);
 
-    // Cache session in extension storage
     await chrome.storage.local.set({
       [sessionCacheKey]: {
         sessionId,
-        contractAddress: contract.address,
-        chainId: chainId,
+        contractAddress: updatedContract.address,
+        chainId,
         createdAt: Date.now(),
         cached_at: Date.now()
       }
     });
 
-    // Prepare initial chat history
-    const greeting = generateInitialGreeting(contract);
+    const greeting = generateInitialGreeting(updatedContract);
     chatHistory = [
-      { role: 'assistant', content: greeting }
+      { role: 'assistant', content: greeting },
+      { role: 'assistant', content: contractDetails }
     ];
-
-    if (contractDetails) {
-      chatHistory.push({ role: 'assistant', content: contractDetails });
-    }
 
     sendResponse({
       success: true,
       sessionId,
-      contract,
+      contract: updatedContract,
       contractDetails,
       chatHistory,
       isRestored: false,
@@ -289,6 +309,7 @@ async function handleInitializeChatSession(request, sendResponse) {
     sendResponse({ error: error.message });
   }
 }
+
 
 async function handleChatMessage(request, sendResponse) {
   try {
