@@ -1,0 +1,36 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.pkl
+*.log
+
+# Virtual environments
+venv/
+ENV/
+env/
+.venv/
+.Python
+
+# IDEs
+.vscode/
+.idea/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Environment variables
+.env
+
+# Dependency files created by pip
+pip-wheel-metadata/
+*.egg-info/
+
+# Panoramix cache or temp files (if any added)
+*.tmp
+*.out
+
+# FastAPI reload cache
+*.reload

@@ -1,4 +1,5 @@
 // src/background/service-worker.js
+import Decompiler from '../services/Decompiler.js';
 import { fetchDecompiledCode, fetchDecompiledSource } from '../services/DeDaub.js';
 import MantleAPI from '../services/mantleAPI.js';
 import { createSession, getSession, handleUserMessage, queryRawContract } from '../services/nebula.js';
@@ -7,6 +8,7 @@ import { getChainId } from '../utils.js';
 let mantleAPI;
 let contractCache = new Map();
 let sessionCache = new Map();
+const decompiler = new Decompiler('http://localhost:8000');
 
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   switch (request.type) {
@@ -239,7 +241,7 @@ async function handleInitializeChatSession(request, sendResponse) {
     const bytecode = await mantleAPI.getBytecode(contract.address);
     console.log(bytecode);
 
-    const decompiled = await fetchDecompiledSource(bytecode);
+    const decompiled = await decompiler.decompileBytecode(bytecode);
     console.log(`[DECOMPILED] for ${contract.address}:\n`, decompiled);
 
     return;
