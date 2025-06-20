@@ -2,7 +2,7 @@
 import Decompiler from '../services/Decompiler.js';
 import { fetchDecompiledCode, fetchDecompiledSource } from '../services/DeDaub.js';
 import MantleAPI from '../services/mantleAPI.js';
-import { createSession, getSession, handleUserMessage, queryRawContract } from '../services/nebula.js';
+import { auditDecompiledContract, createSession, getSession, handleUserMessage, queryRawContract } from '../services/nebula.js';
 import { getChainId } from '../utils.js';
 
 let mantleAPI;
@@ -25,11 +25,14 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     case 'SEND_CHAT_MESSAGE':
       handleChatMessage(request, sendResponse);
       break;
+    case 'SEND_DECOMPILED_CODE':
+      handleDecompiledCodeUpload(request, sendResponse);
+      break;
     case 'OPEN_POPUP':
       chrome.action.openPopup();
       break;
   }
-  return true; // Keep message channel open for async responses
+  return true;
 });
 
 async function handleContractDetected(request, tab) {
@@ -163,14 +166,11 @@ async function handleInitializeChatSession(request, sendResponse) {
     const { contractAddress } = request;
     const contract = contractCache.get(contractAddress) || contractCache.get('current');
 
-    console.log("Initializing chat session for:", contractAddress);
-
     if (!contract) {
       sendResponse({ error: 'No contract found' });
       return;
     }
 
-    // Check for cached session for this specific contract
     const sessionCacheKey = `session_${contractAddress}`;
     let cachedSessionData = await chrome.storage.local.get([sessionCacheKey]);
     let sessionId = '';
@@ -179,8 +179,6 @@ async function handleInitializeChatSession(request, sendResponse) {
     let contractDetails = '';
 
     if (cachedSessionData[sessionCacheKey]) {
-      console.log("Found cached session for contract:", contractAddress);
-
       const cachedSession = cachedSessionData[sessionCacheKey];
       sessionId = cachedSession.sessionId;
 
@@ -227,24 +225,11 @@ async function handleInitializeChatSession(request, sendResponse) {
           });
           return;
         }
-      } catch (error) {
-        console.warn("Failed to load cached session, creating new one:", error);
-      }
+      } catch (error) {}
     }
 
-    // No valid cache — create new session
-    console.log("Creating new session for contract:", contractAddress);
     sessionId = await createSession(`ChainWhisperer - ${contract.contractName || contractAddress.slice(0, 8)}`);
-
     const chainId = getChainId(contract.chain);
-
-    const bytecode = await mantleAPI.getBytecode(contract.address);
-    console.log(bytecode);
-
-    const decompiled = await decompiler.decompileBytecode(bytecode);
-    console.log(`[DECOMPILED] for ${contract.address}:\n`, decompiled);
-
-    return;
     const verifiedData = await mantleAPI.getVerifiedContract(contract.address);
 
     const isActuallyVerified =
@@ -252,37 +237,21 @@ async function handleInitializeChatSession(request, sendResponse) {
       verifiedData.abi !== "Contract source code not verified";
 
     if (!isActuallyVerified) {
-      verifiedData.verified = false;
-      verifiedData.contractName = verifiedData.contractName || 'Unknown';
-      verifiedData.abi = null;
-      verifiedData.sourceCode = null;
-      verifiedData.message = 'Contract not verified oopsie';
-
-      try {
-        const bytecode = await mantleAPI.getBytecode(contract.address);
-        console.log(bytecode);
-
-        const decompiled = await fetchDecompiledSource(bytecode);
-        console.log(`[DECOMPILED] for ${contract.address}:\n`, decompiled);
-      } catch (err) {
-        console.warn(`Failed to decompile bytecode for ${contract.address}:`, err.message);
-      }
-
+      sendResponse({
+        success: false,
+        contract,
+        awaitingUpload: true,
+        message: 'This contract is not verified. Please upload the decompiled bytecode to proceed.'
+      });
+      return;
     }
 
-    contractDetails = '';
-
-
-    if (isActuallyVerified) {
-      contractDetails = await queryRawContract(
-        contract.address,
-        verifiedData.sourceCode,
-        chainId,
-        sessionId
-      );
-    } else {
-      contractDetails = '⚠️ Contract not verified oopsie.\n\n';
-    }
+    contractDetails = await queryRawContract(
+      contract.address,
+      verifiedData.sourceCode,
+      chainId,
+      sessionId
+    );
 
     const updatedContract = {
       ...contract,
@@ -301,13 +270,7 @@ async function handleInitializeChatSession(request, sendResponse) {
     sessionCache.set(`contract_${updatedContract.address}`, sessionCacheInfo);
 
     await chrome.storage.local.set({
-      [sessionCacheKey]: {
-        sessionId,
-        contractAddress: updatedContract.address,
-        chainId,
-        createdAt: Date.now(),
-        cached_at: Date.now()
-      }
+      [sessionCacheKey]: sessionCacheInfo
     });
 
     const greeting = generateInitialGreeting(updatedContract);
@@ -325,10 +288,52 @@ async function handleInitializeChatSession(request, sendResponse) {
       isRestored: false,
       greeting
     });
-
   } catch (error) {
-    console.error('Error initializing chat session:', error);
     sendResponse({ error: error.message });
+  }
+}
+
+async function handleDecompiledCodeUpload(request, sendResponse) {
+  const { contractAddress, bytecodeText } = request;
+  try {
+    const contract = contractCache.get(contractAddress) || contractCache.get('current');
+    const sessionId = await createSession(`Decompiled - ${contractAddress.slice(0, 8)}`);
+    const chainId = getChainId(contract.chain);
+
+    const decompiledResponse = await auditDecompiledContract(
+      contractAddress,
+      bytecodeText,
+      chainId,
+      sessionId
+    );
+
+    const sessionInfo = {
+      sessionId,
+      contractAddress,
+      chainId,
+      createdAt: Date.now()
+    };
+
+    sessionCache.set(sessionId, sessionInfo);
+    sessionCache.set(`contract_${contractAddress}`, sessionInfo);
+
+    await chrome.storage.local.set({
+      [`session_${contractAddress}`]: sessionInfo
+    });
+
+    sendResponse({
+      success: true,
+      sessionId,
+      contract,
+      contractDetails: decompiledResponse,
+      chatHistory: [
+        { role: 'assistant', content: 'Thanks for uploading the decompiled code. Here’s what I found:' },
+        { role: 'assistant', content: decompiledResponse }
+      ],
+      greeting: "Let's review your uploaded contract code."
+    });
+  } catch (error) {
+    sendResponse({ success: false, error: error.message });
   }
 }
 

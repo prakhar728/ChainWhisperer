@@ -207,6 +207,56 @@ async function executeCommand(
   return response; // Return the full response including message and actions
 }
 
+// Audit and verify decompiled contract
+async function auditDecompiledContract(contractAddress, decompiledCode, chainId, sessionId) {
+  const message = `
+    Review the following decompiled smart contract code. Provide a detailed audit summary including:
+    
+    - A structured list of all read-only and write-able functions.
+    - Any potentially dangerous operations (e.g., selfdestruct, delegatecall, raw calls).
+    - Indicators of proxy patterns, access control weaknesses, or upgradeability risks.
+    - Any unusual or suspicious logic.
+
+    Format your response as:
+
+    ### Contract Details:
+    - **Address:** ${contractAddress}
+    - **Chain ID:** ${chainId}
+    - **Source:** Decompiled Bytecode
+
+    ### Read-only Functions:
+    1. \`<functionName(params)>\`
+       - **Returns:** <type>
+       - **Description:** <what it does>
+
+    ### Write-able Functions:
+    1. \`<functionName(params)>\`
+       - **Returns:** <type if any>
+       - **Description:** <what it does>
+       - **Payable:** <true/false>
+       - **Parameters:** <name> <type> <desc>
+
+    ### Security Analysis:
+    - **Risk Level:** <low/medium/high>
+    - **Findings:** 
+      - <concise list of potential security issues or red flags>
+
+    Code to review:
+    \`\`\`solidity
+    ${decompiledCode}
+    \`\`\`
+  `.trim();
+
+  const requestBody = {
+    message,
+    session_id: sessionId
+  };
+
+  const response = await apiRequest("/chat", "POST", requestBody);
+  return response.message;
+}
+
+
 export {
   createSession,
   queryContract,
@@ -217,4 +267,5 @@ export {
   clearSession,
   deleteSession,
   executeCommand,
+  auditDecompiledContract
 };

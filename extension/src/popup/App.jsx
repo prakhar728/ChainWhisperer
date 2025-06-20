@@ -14,6 +14,8 @@ function App() {
   const [error, setError] = useState(null);
   const [isRestored, setIsRestored] = useState(false);
   const messagesEndRef = useRef(null);
+  const [awaitingUpload, setAwaitingUpload] = useState(false);
+  const [pastedBytecode, setPastedBytecode] = useState('');
 
   // Auto-scroll to bottom when new messages arrive
   const scrollToBottom = () => {
@@ -71,7 +73,12 @@ function App() {
             setChatMessages(initialMessages);
           }
         } else {
-          setError(sessionResponse.error);
+          if (sessionResponse.awaitingUpload) {
+            setAwaitingUpload(true);
+            setContract(response);
+          } else {
+            setError(sessionResponse.error || 'Unknown error during session initialization');
+          }
         }
       }
     } catch (err) {
@@ -81,6 +88,33 @@ function App() {
       setLoading(false);
     }
   };
+
+  const handleSubmitBytecode = async () => {
+    if (!pastedBytecode.trim() || !contract) return;
+
+    try {
+      const uploadResponse = await chrome.runtime.sendMessage({
+        type: 'SEND_DECOMPILED_CODE',
+        contractAddress: contract.address,
+        bytecodeText: pastedBytecode
+      });
+
+      if (uploadResponse.success) {
+        setSessionId(uploadResponse.sessionId);
+        setContractDetails(uploadResponse.contractDetails);
+        setChatMessages(uploadResponse.chatHistory);
+        setAwaitingUpload(false);
+        setPastedBytecode('');
+      } else {
+        setError(uploadResponse.error || 'Failed to analyze pasted bytecode.');
+      }
+    } catch (err) {
+      console.error('Error submitting bytecode:', err);
+      setError('Error submitting bytecode.');
+    }
+  };
+
+
 
   const handleSendMessage = async () => {
     if (!inputMessage.trim() || !sessionId || isTyping) return;
@@ -166,6 +200,50 @@ function App() {
       </div>
     );
   }
+
+  if (awaitingUpload) {
+    return (
+      <div className="upload-state">
+        <div className="empty-state">
+          <div>
+            <div className="empty-icon">📦</div>
+            <p className="empty-title">Contract Not Verified</p>
+            <p className="empty-subtitle">
+              This contract isn’t verified. Paste the decompiled bytecode below for analysis.
+            </p>
+
+            <textarea
+              rows="10"
+              placeholder="Paste decompiled bytecode here..."
+              value={pastedBytecode}
+              onChange={(e) => setPastedBytecode(e.target.value)}
+              className="bytecode-textarea"
+              style={{
+                width: '100%',
+                maxWidth: '500px',
+                padding: '10px',
+                marginTop: '10px',
+                fontSize: '14px',
+                borderRadius: '6px',
+                border: '1px solid #ccc',
+                fontFamily: 'monospace'
+              }}
+            />
+
+            <button
+              onClick={handleSubmitBytecode}
+              className="retry-button"
+              style={{ marginTop: '12px' }}
+              disabled={!pastedBytecode.trim()}
+            >
+              Analyze Bytecode
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
 
   if (!contract) {
     return (
